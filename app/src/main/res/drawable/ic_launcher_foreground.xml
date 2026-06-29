@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <!-- Outer Hexagon Shadow or Glow -->
+    <path
+        android:strokeColor="#3F06B6D4"
+        android:strokeWidth="6"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:pathData="M 54,23 L 81.7,39 L 81.7,71 L 54,87 L 26.3,71 L 26.3,39 Z" />
+
+    <!-- Core Hexagon Line (Cyan to Violet Gradient) -->
+    <path
+        android:strokeWidth="3.5"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:pathData="M 54,24 L 80,39 L 80,69 L 54,84 L 28,69 L 28,39 Z">
+        <aapt:attr name="android:strokeColor">
+            <gradient
+                android:startX="28"
+                android:startY="39"
+                android:endX="80"
+                android:endY="69"
+                android:type="linear">
+                <item android:color="#06B6D4" android:offset="0.0" />
+                <item android:color="#A855F7" android:offset="1.0" />
+            </gradient>
+        </aapt:attr>
+    </path>
+
+    <!-- Glowing Play Triangle (centered) -->
+    <path
+        android:fillType="nonZero"
+        android:pathData="M 46,39 L 70,54 L 46,69 Z">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:startX="46"
+                android:startY="54"
+                android:endX="70"
+                android:endY="54"
+                android:type="linear">
+                <item android:color="#06B6D4" android:offset="0.0" />
+                <item android:color="#EC4899" android:offset="1.0" />
+            </gradient>
+        </aapt:attr>
+    </path>
+</vector>

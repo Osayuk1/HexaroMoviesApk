@@ -1,0 +1,6 @@
+{
+  "name": "Hexaro Movies",
+  "description": "A premium movie streaming UI integrating with TMDB and high-speed Downloader API links.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

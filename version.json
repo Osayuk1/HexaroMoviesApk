@@ -1,0 +1,6 @@
+{
+  "versionCode": 22,
+  "versionName": "1.21",
+  "downloadUrl": "https://github.com/Osayuk1/HexaroMoviesApk/releases/latest",
+  "changelog": "Rigorous stream quality fetcher showing accurate download size in MB before downloading. Added setting option to completely disable adaptive HLS streaming. Hidden direct video quality selector for local offline files. Fixed update popup dismiss issue and other bugs."
+}
