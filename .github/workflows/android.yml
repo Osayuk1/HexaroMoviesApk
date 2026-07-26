@@ -1,0 +1,246 @@
+name: Build Hexaro Release APK
+
+on:
+  push:
+    branches: [ "main", "master" ]
+  pull_request:
+    branches: [ "main", "master" ]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  actions: write
+
+jobs:
+  build:
+    name: Build & Assemble Debug APK
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout Code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+        persist-credentials: false
+
+    - name: Sync to Public Repo
+      if: github.repository != 'Osayuk1/HexaroMoviesApk'
+      env:
+        PUBLIC_REPO_TOKEN: ${{ secrets.PUBLIC_REPO_TOKEN }}
+      run: |
+        if [ ! -z "$PUBLIC_REPO_TOKEN" ]; then
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local --unset http.https://github.com/.extraheader || true
+          
+          # Create an orphan branch with no commit history
+          git checkout --orphan temp-sync-branch
+          git add -A
+          git commit -m "Update Hexaro Movies to latest version"
+          
+          git remote add public "https://x-access-token:${PUBLIC_REPO_TOKEN}@github.com/Osayuk1/HexaroMoviesApk.git"
+          git push public temp-sync-branch:main --force
+        fi
+
+    - name: Change README to Hexaro Movies Description
+      run: |
+        cat << 'EOF' > README.md
+        # Hexaro Movies
+
+        Hexaro Movies is an Android streaming aggregator built with modern Kotlin and Jetpack Compose. It is designed to deliver a native, ad-free streaming experience with offline supports, customizable theme engines, and high-performance local caching.
+
+        ![Kotlin](https://img.shields.io/badge/Kotlin-7F52FF?style=for-the-badge&logo=kotlin&logoColor=white) ![Jetpack Compose](https://img.shields.io/badge/Compose-4285F4?style=for-the-badge&logo=jetpackcompose&logoColor=white) ![Android](https://img.shields.io/badge/Android-3DDC84?style=for-the-badge&logo=android&logoColor=white) ![SQLite](https://img.shields.io/badge/SQLite-07405e?style=for-the-badge&logo=sqlite&logoColor=white) ![Gradle](https://img.shields.io/badge/Gradle-02303A?style=for-the-badge&logo=gradle&logoColor=white)
+
+        ---
+
+        ## Key Capabilities
+
+        * **Ad-Free Media Aggregator**: Structured embedded player framework supporting major streaming sources (vidsrc, multiembed, 2embed) with responsive playback controls, automated season/episode progression tracking, and swipe-to-gesture (brightness/volume/speed) controls.
+        * **Offline Storage Engine**: Support for direct episode and film streaming downloads to a dedicated Offline Library tab for offline playback.
+        * **Intelligent Progress Persistence**: Automated real-time local logging of watching sessions with a dedicated "Currently Watching" dashboard on the home navigation.
+        * **Robust Local Synchronization**: Complete offline-first Room state system supporting:
+            * **Watchlist**: Track future interest with instant status toggles.
+            * **Progress History**: Track individual playback milestones and episode numbers.
+            * **Favorites**: Dedicated curation for favorite films and television shows.
+        * **Custom Color Themes**: Theme customization engine including multiple custom themes: Cosmic Purple (Default), Emerald Ocean, Crimson Shadow, Sapphire Star, and Sunset Gold.
+        * **Adaptive Android Layout**: Edge-to-edge system bar layout, fully optimizing padding against display notches and device aspect ratios.
+
+        ## Architecture & Technology Stack
+
+        * **UI Layer**: Built entirely in Jetpack Compose utilizing standard Material Design 3 guidelines.
+        * **Software Design Pattern**: Model-View-ViewModel (MVVM) coupled with standard unidirectional state flow via Coroutines `StateFlow` and `SharedFlow`.
+        * **Local Persistence**: SQLite database wrapped in modern Room persistence library with customized type converters for complex schema indexing.
+        * **Concurrency**: Pure Kotlin Coroutines for asynchronous network pooling and background download queues.
+        * **Image Delivery**: Coroutine-assisted caching and rendering via the Coil framework.
+
+        ## Setup & Build
+
+        1. **Clone the repository:**
+           ```bash
+           git clone https://github.com/Osayuk1/HexaroMoviesApk.git
+           cd HexaroMoviesApk
+           ```
+
+        2. **Configure Environment Variables:**
+           Rename `.env.example` in the root folder to `.env` and assign your standard API key values:
+           ```env
+           TMDB_API_KEY=your_tmdb_api_key
+           ```
+
+        3. **Assemble Debug Build:**
+           ```bash
+           ./gradlew assembleDebug
+           ```
+        EOF
+
+    - name: Create Environment Secrets File
+      env:
+        TMDB_API_KEY_SEC: ${{ secrets.TMDB_API_KEY }}
+        TMDB_API_KEY_SEC_LOWER: ${{ secrets.tmdb_api_key }}
+      run: |
+        # Resolve the TMDB API key from active GitHub secrets
+        RESOLVED_KEY=""
+        if [ ! -z "$TMDB_API_KEY_SEC" ]; then
+          RESOLVED_KEY="$TMDB_API_KEY_SEC"
+        elif [ ! -z "$TMDB_API_KEY_SEC_LOWER" ]; then
+          RESOLVED_KEY="$TMDB_API_KEY_SEC_LOWER"
+        else
+          RESOLVED_KEY="your_tmdb_api_key"
+        fi
+        echo "TMDB_API_KEY=$RESOLVED_KEY" > .env
+
+    - name: Decode Keystore
+      run: |
+        if [ -f debug.keystore.base64 ]; then
+          base64 -d debug.keystore.base64 > debug.keystore || base64 --decode debug.keystore.base64 > debug.keystore
+        fi
+
+    - name: Decode Signing Key
+      env:
+        SIGNING_KEY_BASE64: ${{ secrets.SIGNING_KEY }}
+      run: |
+        if [ ! -z "$SIGNING_KEY_BASE64" ]; then
+          echo "$SIGNING_KEY_BASE64" | base64 --decode > my-upload-key.jks || echo "$SIGNING_KEY_BASE64" | base64 -d > my-upload-key.jks
+        fi
+
+    - name: Set up JDK 17
+      uses: actions/setup-java@v4
+      with:
+        java-version: '17'
+        distribution: 'temurin'
+
+    - name: Setup Gradle
+      uses: gradle/actions/setup-gradle@v4
+      with:
+        gradle-version: '9.3.1'
+        validate-wrappers: false
+
+    - name: Build APKs
+      env:
+        KEYSTORE_PATH: ${{ github.workspace }}/my-upload-key.jks
+        STORE_PASSWORD: ${{ secrets.KEY_STORE_PASSWORD }}
+        KEY_ALIAS: ${{ secrets.ALIAS }}
+        KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+      run: |
+        if [ -f my-upload-key.jks ]; then
+          gradle assembleRelease
+        else
+          gradle assembleDebug
+        fi
+
+    - name: Send APK to Telegram Channel
+      env:
+        TELEGRAM_BOT_TOKEN: "8711109574:AAHC5A-vZWt053OhUCYcXELDgD1u4UUsflQ"
+        TELEGRAM_CHAT_ID: "-1003938750309"
+      run: |
+        # Find generated APK
+        APK_PATH=""
+        if [ -f "app/build/outputs/apk/release/app-release.apk" ]; then
+          APK_PATH="app/build/outputs/apk/release/app-release.apk"
+        elif [ -f "app/build/outputs/apk/debug/app-debug.apk" ]; then
+          APK_PATH="app/build/outputs/apk/debug/app-debug.apk"
+        else
+          APK_PATH=$(find app/build/outputs/apk -name "*.apk" -type f | head -n 1)
+        fi
+
+        if [ -z "$APK_PATH" ] || [ ! -f "$APK_PATH" ]; then
+          echo "❌ Error: No APK file found to send!"
+          exit 1
+        fi
+
+        APK_NAME=$(basename "$APK_PATH")
+        FILE_SIZE_BYTES=$(stat -c%s "$APK_PATH" 2>/dev/null || stat -f%z "$APK_PATH" 2>/dev/null)
+        FILE_SIZE_MB=$(awk "BEGIN {printf \"%.2f MB\", $FILE_SIZE_BYTES/1048576}")
+
+        # Gather metadata
+        COMMIT_SHA="${GITHUB_SHA::7}"
+        COMMIT_MSG=$(git log -1 --pretty=format:"%s" 2>/dev/null || echo "Manual trigger")
+        BRANCH="${GITHUB_REF_NAME}"
+        BUILD_NUM="${GITHUB_RUN_NUMBER}"
+        ACTOR="${GITHUB_ACTOR}"
+        BUILD_TIME=$(date -u +"%Y-%m-%d %H:%M:%S UTC")
+
+        # HTML escape function
+        escape_html() {
+          echo "$1" | sed 's/&/\&amp;/g; s/</\&lt;/g; s/>/\&gt;/g'
+        }
+
+        SAFE_COMMIT_MSG=$(escape_html "$COMMIT_MSG")
+        SAFE_ACTOR=$(escape_html "$ACTOR")
+        SAFE_BRANCH=$(escape_html "$BRANCH")
+        SAFE_APK_NAME=$(escape_html "$APK_NAME")
+
+        CAPTION="🎬 <b>Hexaro Movies - APK Build #${BUILD_NUM}</b>
+
+        📦 <b>File Name:</b> <code>${SAFE_APK_NAME}</code>
+        📊 <b>File Size:</b> ${FILE_SIZE_MB}
+        🌿 <b>Branch:</b> <code>${SAFE_BRANCH}</code>
+        📌 <b>Commit SHA:</b> <code>${COMMIT_SHA}</code>
+        👤 <b>Triggered By:</b> ${SAFE_ACTOR}
+        🕒 <b>Build Timestamp:</b> ${BUILD_TIME}
+
+        💬 <b>Commit Message:</b>
+        <i>${SAFE_COMMIT_MSG}</i>"
+
+        echo "Uploading $APK_PATH ($FILE_SIZE_MB) to Telegram channel $TELEGRAM_CHAT_ID..."
+
+        RESPONSE=$(curl -s -w "\n%{http_code}" -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendDocument" \
+          -F "chat_id=${TELEGRAM_CHAT_ID}" \
+          -F "document=@${APK_PATH}" \
+          -F "caption=${CAPTION}" \
+          -F "parse_mode=HTML")
+
+        HTTP_CODE=$(echo "$RESPONSE" | tail -n1)
+        BODY=$(echo "$RESPONSE" | sed '$d')
+
+        echo "Telegram Response (HTTP $HTTP_CODE): $BODY"
+
+        if [ "$HTTP_CODE" -ne 200 ]; then
+          echo "❌ Error: Failed to upload APK to Telegram channel! HTTP status: $HTTP_CODE"
+          exit 1
+        fi
+        echo "✅ APK successfully delivered to Telegram channel!"
+
+    - name: Delete older releases
+      if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master') && github.repository == 'Osayuk1/HexaroMoviesApk'
+      uses: dev-drprasad/delete-older-releases@v0.3.1
+      with:
+        keep_latest: 0
+        delete_tags: true
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Create GitHub Release
+      if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master') && github.repository == 'Osayuk1/HexaroMoviesApk'
+      uses: softprops/action-gh-release@v2
+      with:
+        tag_name: "v${{ github.run_number }}"
+        name: "Release v${{ github.run_number }}"
+        draft: false
+        prerelease: false
+        generate_release_notes: true
+        files: |
+          app/build/outputs/apk/release/*.apk
+          app/build/outputs/apk/debug/*.apk
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
